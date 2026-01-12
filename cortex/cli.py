@@ -2001,6 +2001,20 @@ class CortexCLI:
                 console.print(f"Error: {result.error_message}", style="red")
             return 1
 
+    def doctor(self) -> int:
+        """Run system health checks."""
+        from cortex.doctor import SystemDoctor
+
+        doc = SystemDoctor()
+        return doc.run_checks()
+
+    def troubleshoot(self) -> int:
+        """Run interactive troubleshooter."""
+        from cortex.troubleshoot import Troubleshooter
+
+        troubleshooter = Troubleshooter()
+        return troubleshooter.start()
+
     # --------------------------
 
 
@@ -2478,6 +2492,12 @@ def main():
     )
     # --------------------------
 
+    # Doctor command
+    subparsers.add_parser("doctor", help="System health check")
+
+    # Troubleshoot command
+    subparsers.add_parser("troubleshoot", help="Interactive system troubleshooter")
+
     args = parser.parse_args()
 
     # The Guard: Check for empty commands before starting the CLI
@@ -2531,6 +2551,10 @@ def main():
             return 1
         elif args.command == "env":
             return cli.env(args)
+        elif args.command == "doctor":
+            return cli.doctor()
+        elif args.command == "troubleshoot":
+            return cli.troubleshoot()
         else:
             parser.print_help()
             return 1
