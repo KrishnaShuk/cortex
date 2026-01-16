@@ -7,8 +7,8 @@ This module provides the Troubleshooter class which:
 3. Executes commands on behalf of the user (with confirmation)
 """
 
-import re
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -23,6 +23,7 @@ from rich.syntax import Syntax
 from cortex.api_key_detector import auto_detect_api_key
 from cortex.ask import AskHandler
 from cortex.logging_system import CortexLogger
+from cortex.resolutions import ResolutionManager
 
 console = Console()
 
@@ -68,6 +69,8 @@ class Troubleshooter:
         except Exception as e:
             self.logger.warning(f"Failed to initialize AI: {e}")
             self.ai = None
+
+        self.resolutions = ResolutionManager()
 
     def _get_provider(self) -> str:
         """Determine which LLM provider to use."""
@@ -162,6 +165,32 @@ class Troubleshooter:
                 user_input = Prompt.ask("\n[bold green]You[/bold green]")
 
                 if user_input.lower() in ["exit", "quit", "q"]:
+                    # Learning Trigger
+                    if Confirm.ask("Did we solve your problem?"):
+                        with console.status("[cyan]Learning from success...[/cyan]"):
+                            history_text = "\n".join(
+                                [f"{m['role']}: {m['content']}" for m in self.messages]
+                            )
+                            try:
+                                extraction = self.ai.ask(
+                                    f"Analyze this troubleshooting session. Extract the core issue and the specific command that fixed it. Return ONLY a JSON object with keys 'issue' and 'fix'.\n\nSession:\n{history_text}",
+                                    system_prompt="You are a knowledge extraction bot. Return only valid JSON.",
+                                )
+                                # Simple parsing (robustness can be improved)
+                                import json
+
+                                # Clean up potential markdown code blocks
+                                clean_json = (
+                                    extraction.replace("```json", "").replace("```", "").strip()
+                                )
+                                data = json.loads(clean_json)
+
+                                if "issue" in data and "fix" in data:
+                                    self.resolutions.save(data["issue"], data["fix"])
+                                    console.print("[bold green]✓ Knowledge saved![/bold green]")
+                            except Exception as e:
+                                self.logger.warning(f"Failed to learn resolution: {e}")
+
                     console.print("[dim]Exiting troubleshooter.[/dim]")
                     break
 
@@ -187,7 +216,7 @@ class Troubleshooter:
 
                     log_file = "cortex_support_log.txt"
                     log_path = os.path.abspath(log_file)
-                    
+
                     with open(log_file, "w") as f:
                         f.write("Cortex Troubleshooting Log\n")
                         f.write("==========================\n\n")
@@ -208,10 +237,20 @@ class Troubleshooter:
                         [f"{m['role']}: {m['content']}" for m in self.messages[-5:]]
                     )
 
+                    # Dynamic Recall: Search for relevant past resolutions
+                    relevant_fixes = self.resolutions.search(user_input)
+                    current_system_prompt = self.messages[0]["content"]
+
+                    if relevant_fixes:
+                        fixes_text = "\n".join(
+                            [f"- Issue: {r['issue']} -> Fix: {r['fix']}" for r in relevant_fixes]
+                        )
+                        current_system_prompt += f"\n\n[MEMORY] Here are past successful fixes for similar issues:\n{fixes_text}"
+
                     # We pass the system prompt explicitly to override AskHandler's default
                     response = self.ai.ask(
                         question=f"History:\n{history_text}\n\nUser: {user_input}",
-                        system_prompt=self.messages[0]["content"],  # The initial system prompt
+                        system_prompt=current_system_prompt,  # The initial system prompt + memory
                     )
 
                 console.print(Markdown(response))

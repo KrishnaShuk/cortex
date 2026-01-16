@@ -15,11 +15,17 @@ class TestExtractCodeBlocks(unittest.TestCase):
 
     def setUp(self):
         """Set up test fixtures."""
+        self.mock_res_manager_patcher = patch("cortex.troubleshoot.ResolutionManager")
+        self.mock_res_manager = self.mock_res_manager_patcher.start()
+
         # Mock the API key detector to avoid dependency on real config
         with patch("cortex.troubleshoot.auto_detect_api_key") as mock_detect:
             mock_detect.return_value = (True, "fake-key", "fake", "test")
             with patch("cortex.troubleshoot.AskHandler"):
                 self.troubleshooter = Troubleshooter()
+
+    def tearDown(self):
+        self.mock_res_manager_patcher.stop()
 
     def test_extract_bash_block(self):
         """Test extracting a bash code block."""
@@ -92,10 +98,16 @@ class TestIsCommandSafe(unittest.TestCase):
 
     def setUp(self):
         """Set up test fixtures."""
+        self.mock_res_manager_patcher = patch("cortex.troubleshoot.ResolutionManager")
+        self.mock_res_manager = self.mock_res_manager_patcher.start()
+
         with patch("cortex.troubleshoot.auto_detect_api_key") as mock_detect:
             mock_detect.return_value = (True, "fake-key", "fake", "test")
             with patch("cortex.troubleshoot.AskHandler"):
                 self.troubleshooter = Troubleshooter()
+
+    def tearDown(self):
+        self.mock_res_manager_patcher.stop()
 
     def test_safe_command_ls(self):
         """Test that 'ls' is safe."""
@@ -167,10 +179,16 @@ class TestExecuteCommand(unittest.TestCase):
 
     def setUp(self):
         """Set up test fixtures."""
+        self.mock_res_manager_patcher = patch("cortex.troubleshoot.ResolutionManager")
+        self.mock_res_manager = self.mock_res_manager_patcher.start()
+
         with patch("cortex.troubleshoot.auto_detect_api_key") as mock_detect:
             mock_detect.return_value = (True, "fake-key", "fake", "test")
             with patch("cortex.troubleshoot.AskHandler"):
                 self.troubleshooter = Troubleshooter()
+
+    def tearDown(self):
+        self.mock_res_manager_patcher.stop()
 
     def test_execute_simple_command(self):
         """Test executing a simple echo command."""
@@ -223,6 +241,8 @@ class TestExecuteCommand(unittest.TestCase):
         args, _ = mock_run.call_args
         self.assertNotIn("firejail", args[0])
         self.assertEqual(args[0], "ls")
+
+
 class TestDangerousPatterns(unittest.TestCase):
     """Tests for DANGEROUS_PATTERNS constant."""
 
@@ -243,6 +263,13 @@ class TestDangerousPatterns(unittest.TestCase):
 
 class TestGetProvider(unittest.TestCase):
     """Tests for _get_provider method."""
+
+    def setUp(self):
+        self.mock_res_manager_patcher = patch("cortex.troubleshoot.ResolutionManager")
+        self.mock_res_manager = self.mock_res_manager_patcher.start()
+
+    def tearDown(self):
+        self.mock_res_manager_patcher.stop()
 
     def test_get_provider_returns_claude_for_anthropic(self):
         """Test that 'anthropic' is mapped to 'claude'."""
@@ -272,6 +299,13 @@ class TestGetProvider(unittest.TestCase):
 class TestGetApiKey(unittest.TestCase):
     """Tests for _get_api_key method."""
 
+    def setUp(self):
+        self.mock_res_manager_patcher = patch("cortex.troubleshoot.ResolutionManager")
+        self.mock_res_manager = self.mock_res_manager_patcher.start()
+
+    def tearDown(self):
+        self.mock_res_manager_patcher.stop()
+
     def test_get_api_key_returns_key(self):
         """Test that API key is returned correctly."""
         with patch("cortex.troubleshoot.auto_detect_api_key") as mock_detect:
@@ -291,6 +325,13 @@ class TestGetApiKey(unittest.TestCase):
 
 class TestStart(unittest.TestCase):
     """Tests for start method."""
+
+    def setUp(self):
+        self.mock_res_manager_patcher = patch("cortex.troubleshoot.ResolutionManager")
+        self.mock_res_manager = self.mock_res_manager_patcher.start()
+
+    def tearDown(self):
+        self.mock_res_manager_patcher.stop()
 
     @patch("cortex.troubleshoot.console")
     def test_start_no_ai_returns_error(self, mock_console):
@@ -321,11 +362,23 @@ class TestStart(unittest.TestCase):
 class TestInteractiveLoop(unittest.TestCase):
     """Tests for _interactive_loop method."""
 
+    def setUp(self):
+        self.mock_res_manager_patcher = patch("cortex.troubleshoot.ResolutionManager")
+        self.mock_res_manager_cls = self.mock_res_manager_patcher.start()
+        self.mock_res_manager = self.mock_res_manager_cls.return_value
+        # Default search returns empty list to avoid side effects
+        self.mock_res_manager.search.return_value = []
+
+    def tearDown(self):
+        self.mock_res_manager_patcher.stop()
+
     @patch("cortex.troubleshoot.console")
     @patch("cortex.troubleshoot.Prompt")
-    def test_exit_command(self, mock_prompt, mock_console):
+    @patch("cortex.troubleshoot.Confirm")
+    def test_exit_command(self, mock_confirm, mock_prompt, mock_console):
         """Test that 'exit' command exits the loop."""
         mock_prompt.ask.return_value = "exit"
+        mock_confirm.ask.return_value = False  # User says "No" to learning
         with patch("cortex.troubleshoot.auto_detect_api_key") as mock_detect:
             mock_detect.return_value = (True, "test-key", "fake", "env")
             with patch("cortex.troubleshoot.AskHandler"):
@@ -336,9 +389,11 @@ class TestInteractiveLoop(unittest.TestCase):
 
     @patch("cortex.troubleshoot.console")
     @patch("cortex.troubleshoot.Prompt")
-    def test_quit_command(self, mock_prompt, mock_console):
+    @patch("cortex.troubleshoot.Confirm")
+    def test_quit_command(self, mock_confirm, mock_prompt, mock_console):
         """Test that 'quit' command exits the loop."""
         mock_prompt.ask.return_value = "quit"
+        mock_confirm.ask.return_value = False  # User says "No" to learning
         with patch("cortex.troubleshoot.auto_detect_api_key") as mock_detect:
             mock_detect.return_value = (True, "test-key", "fake", "env")
             with patch("cortex.troubleshoot.AskHandler"):
@@ -371,13 +426,13 @@ class TestInteractiveLoop(unittest.TestCase):
     def test_help_command(self, mock_prompt, mock_console):
         """Test that 'help' command creates log file and prints instructions."""
         mock_prompt.ask.side_effect = ["help", "exit"]
-        
+
         with patch("cortex.troubleshoot.auto_detect_api_key") as mock_detect:
             mock_detect.return_value = (True, "test-key", "fake", "env")
             with patch("cortex.troubleshoot.AskHandler"):
                 troubleshooter = Troubleshooter()
                 troubleshooter.messages = [{"role": "system", "content": "test"}]
-                
+
                 # Mock AI for summary generation
                 mock_ai = MagicMock()
                 mock_ai.ask.return_value = "Issue Summary: Test issue"
@@ -387,10 +442,10 @@ class TestInteractiveLoop(unittest.TestCase):
                 with patch("builtins.open", unittest.mock.mock_open()) as mock_file:
                     with patch("os.path.abspath", return_value="/abs/path/to/log"):
                         troubleshooter._interactive_loop()
-                        
+
                         # Verify file was opened for writing
                         mock_file.assert_called_with("cortex_support_log.txt", "w")
-                        
+
                         # Verify content was written
                         handle = mock_file()
                         handle.write.assert_any_call("Cortex Troubleshooting Log\n")
@@ -399,8 +454,68 @@ class TestInteractiveLoop(unittest.TestCase):
 
                 # Verify instructions were printed
                 mock_console.print.assert_any_call(
-                    f"Please open a new issue and attach the cortex_support_log.txt file."
+                    "Please open a new issue and attach the cortex_support_log.txt file."
                 )
+
+    @patch("cortex.troubleshoot.console")
+    @patch("cortex.troubleshoot.Prompt")
+    @patch("cortex.troubleshoot.Confirm")
+    def test_learning_on_exit(self, mock_confirm, mock_prompt, mock_console):
+        """Test that we learn from successful sessions on exit."""
+        mock_prompt.ask.side_effect = ["exit"]
+        mock_confirm.ask.return_value = True  # User says "Yes, problem solved"
+
+        with patch("cortex.troubleshoot.auto_detect_api_key") as mock_detect:
+            mock_detect.return_value = (True, "test-key", "fake", "env")
+            with patch("cortex.troubleshoot.AskHandler"):
+                with patch("cortex.troubleshoot.ResolutionManager") as MockResManager:
+                    troubleshooter = Troubleshooter()
+                    troubleshooter.messages = [{"role": "system", "content": "test"}]
+
+                    # Mock AI extraction
+                    mock_ai = MagicMock()
+                    mock_ai.ask.return_value = '{"issue": "test issue", "fix": "test fix"}'
+                    troubleshooter.ai = mock_ai
+
+                    troubleshooter._interactive_loop()
+
+                    # Verify save was called
+                    troubleshooter.resolutions.save.assert_called_with("test issue", "test fix")
+
+    @patch("cortex.troubleshoot.console")
+    @patch("cortex.troubleshoot.Prompt")
+    def test_dynamic_recall(self, mock_prompt, mock_console):
+        """Test that we search for resolutions and inject them."""
+        mock_prompt.ask.side_effect = ["docker fail", "exit"]
+
+        with patch("cortex.troubleshoot.auto_detect_api_key") as mock_detect:
+            mock_detect.return_value = (True, "test-key", "fake", "env")
+            with patch("cortex.troubleshoot.AskHandler"):
+                with patch("cortex.troubleshoot.ResolutionManager") as MockResManager:
+                    troubleshooter = Troubleshooter()
+
+                    # Mock search results
+                    mock_manager = MockResManager.return_value
+                    mock_manager.search.return_value = [
+                        {"issue": "Docker fail", "fix": "systemctl start docker"}
+                    ]
+                    troubleshooter.resolutions = mock_manager
+
+                    # Mock AI
+                    mock_ai = MagicMock()
+                    mock_ai.ask.return_value = "Try this"
+                    troubleshooter.ai = mock_ai
+
+                    troubleshooter._interactive_loop()
+
+                    # Verify search was called
+                    mock_manager.search.assert_called_with("docker fail")
+
+                    # Verify injection (by checking the call to ai.ask)
+                    args, kwargs = mock_ai.ask.call_args
+                    system_prompt = kwargs.get("system_prompt", "")
+                    self.assertIn("[MEMORY]", system_prompt)
+                    self.assertIn("systemctl start docker", system_prompt)
 
     @patch("cortex.troubleshoot.console")
     @patch("cortex.troubleshoot.Prompt")
