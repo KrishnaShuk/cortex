@@ -2832,11 +2832,11 @@ class CortexCLI:
         doc = SystemDoctor()
         return doc.run_checks()
 
-    def troubleshoot(self) -> int:
+    def troubleshoot(self, no_execute: bool = False) -> int:
         """Run interactive troubleshooter."""
         from cortex.troubleshoot import Troubleshooter
 
-        troubleshooter = Troubleshooter()
+        troubleshooter = Troubleshooter(no_execute=no_execute)
         return troubleshooter.start()
 
     # --------------------------
@@ -3437,10 +3437,17 @@ def main():
     # --------------------------
 
     # Doctor command
-    subparsers.add_parser("doctor", help="System health check")
+    doctor_parser = subparsers.add_parser("doctor", help="System health check")
 
     # Troubleshoot command
-    subparsers.add_parser("troubleshoot", help="Interactive system troubleshooter")
+    troubleshoot_parser = subparsers.add_parser(
+        "troubleshoot", help="Interactive system troubleshooter"
+    )
+    troubleshoot_parser.add_argument(
+        "--no-execute",
+        action="store_true",
+        help="Disable automatic command execution (read-only mode)",
+    )
     # License and upgrade commands
     subparsers.add_parser("upgrade", help="Upgrade to Cortex Pro")
     subparsers.add_parser("license", help="Show license status")
@@ -3645,7 +3652,9 @@ def main():
         elif args.command == "doctor":
             return cli.doctor()
         elif args.command == "troubleshoot":
-            return cli.troubleshoot()
+            return cli.troubleshoot(
+                no_execute=getattr(args, "no_execute", False),
+            )
         elif args.command == "upgrade":
             from cortex.licensing import open_upgrade_page
 

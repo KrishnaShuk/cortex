@@ -7,8 +7,10 @@ This module provides the Troubleshooter class which:
 3. Executes commands on behalf of the user (with confirmation)
 """
 
+import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -42,14 +44,17 @@ DANGEROUS_PATTERNS = [
     r"\breboot\b",  # Reboot
     r"\binit\s+0\b",  # Halt
     r"\bpoweroff\b",  # Poweroff
-    r"\|\s*bash",  # Pipe to bash
-    r"\|\s*sh",  # Pipe to sh
+    r"\|\s*(?:.*/)?(?:bash|sh|zsh)\b",  # Pipe to shell (matches bash, sh, zsh, /bin/bash, etc.)
 ]
+
+# Number of recent messages to keep for context
+MAX_HISTORY_CONTEXT = 5
 
 
 class Troubleshooter:
-    def __init__(self):
+    def __init__(self, no_execute: bool = False):
         self.logger = CortexLogger("troubleshooter")
+        self.no_execute = no_execute
         self.messages: list[dict[str, str]] = []
 
         # Initialize AI
@@ -62,8 +67,11 @@ class Troubleshooter:
             else:
                 self.provider = provider_name
             # Validate key presence (Ollama uses dummy key, so it's fine)
-            if not self.api_key and self.provider != "ollama":
-                raise ValueError(f"No API key found for provider '{self.provider}'")
+            if not self.api_key:
+                if self.provider == "ollama":
+                    self.api_key = "ollama"
+                else:
+                    raise ValueError(f"No API key found for provider '{self.provider}'")
             self.ai = AskHandler(self.api_key, self.provider)
             self.ai.cache = None  # Disable caching for conversational context
         except Exception as e:
@@ -71,18 +79,6 @@ class Troubleshooter:
             self.ai = None
 
         self.resolutions = ResolutionManager()
-
-    def _get_provider(self) -> str:
-        """Determine which LLM provider to use."""
-        found, _, provider, _ = auto_detect_api_key()
-        if provider == "anthropic":
-            return "claude"
-        return provider or "openai"
-
-    def _get_api_key(self) -> str:
-        """Get the API key for the configured provider."""
-        found, key, _, _ = auto_detect_api_key()
-        return key or ""
 
     def start(self) -> int:
         """Start the troubleshooting session."""
@@ -141,12 +137,12 @@ class Troubleshooter:
 
         exec_cmd = cmd
         if use_sandbox:
-            exec_cmd = f"firejail --quiet --private-tmp {cmd}"
+            exec_cmd = f"firejail --quiet --private-tmp -- bash -c {shlex.quote(cmd)}"
             self.logger.info("Using Firejail sandbox for command execution")
 
         try:
             result = subprocess.run(
-                exec_cmd, shell=True, capture_output=True, text=True, timeout=30
+                exec_cmd, shell=True, capture_output=True, text=True, timeout=120
             )
             output = result.stdout
             if result.stderr:
@@ -176,9 +172,6 @@ class Troubleshooter:
                                     f"Analyze this troubleshooting session. Extract the core issue and the specific command that fixed it. Return ONLY a JSON object with keys 'issue' and 'fix'.\n\nSession:\n{history_text}",
                                     system_prompt="You are a knowledge extraction bot. Return only valid JSON.",
                                 )
-                                # Simple parsing (robustness can be improved)
-                                import json
-                                import re
 
                                 # Use regex to find the JSON block
                                 match = re.search(r"\{.*\}", extraction, re.DOTALL)
@@ -219,7 +212,8 @@ class Troubleshooter:
                             system_prompt="Create a concise summary of the issue with user's POV",
                         )
 
-                    log_file = "cortex_support_log.txt"
+                    log_file = os.path.expanduser("~/.cortex/cortex_support_log.txt")
+                    os.makedirs(os.path.dirname(log_file), exist_ok=True)
                     log_path = os.path.abspath(log_file)
 
                     with open(log_file, "w") as f:
@@ -231,7 +225,7 @@ class Troubleshooter:
                     console.print(
                         f"\n[bold green]✓ Diagnostic log saved to {log_path}[/bold green]"
                     )
-                    console.print(f"Please open a new issue and attach the {log_file} file.")
+                    console.print(f"Please open a new issue and attach the {log_path} file.")
                     continue
 
                 self.messages.append({"role": "user", "content": user_input})
@@ -239,7 +233,10 @@ class Troubleshooter:
                 with console.status("[cyan]Thinking...[/cyan]"):
                     # Construct prompt with history
                     history_text = "\n".join(
-                        [f"{m['role']}: {m['content']}" for m in self.messages[-5:]]
+                        [
+                            f"{m['role']}: {m['content']}"
+                            for m in self.messages[-MAX_HISTORY_CONTEXT:]
+                        ]
                     )
 
                     # Dynamic Recall: Search for relevant past resolutions
@@ -280,6 +277,10 @@ class Troubleshooter:
                             )
                             console.print(f"[dim]Reason: {reason}[/dim]")
                             self.logger.warning(f"Blocked dangerous command: {cmd}")
+                            continue
+
+                        if self.no_execute:
+                            console.print("\n[dim]Execution skipped (read-only mode)[/dim]")
                             continue
 
                         if Confirm.ask("Execute this command?"):

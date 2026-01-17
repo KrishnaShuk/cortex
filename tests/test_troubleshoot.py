@@ -200,10 +200,19 @@ class TestExecuteCommand(unittest.TestCase):
         output = self.troubleshooter._execute_command("ls /nonexistent_directory_12345")
         self.assertIn("[STDERR]", output)
 
-    def test_execute_command_captures_output(self):
+    @patch("cortex.troubleshoot.shutil.which")
+    @patch("cortex.troubleshoot.subprocess.run")
+    def test_execute_command_captures_output(self, mock_run, mock_which):
         """Test that stdout is captured."""
+        mock_which.return_value = "/usr/bin/firejail"
+        mock_run.return_value = MagicMock(stdout="test output", stderr="", returncode=0)
+
         output = self.troubleshooter._execute_command("echo 'test output'")
         self.assertEqual(output.strip(), "test output")
+
+        # Verify correct firejail invocation with bash -c
+        args, _ = mock_run.call_args
+        self.assertIn("bash -c", args[0])
 
     @patch("subprocess.run")
     def test_execute_command_timeout(self, mock_run):
@@ -441,20 +450,21 @@ class TestInteractiveLoop(unittest.TestCase):
                 # Mock file opening to avoid actual file creation
                 with patch("builtins.open", unittest.mock.mock_open()) as mock_file:
                     with patch("os.path.abspath", return_value="/abs/path/to/log"):
-                        troubleshooter._interactive_loop()
+                        with patch("os.path.expanduser", return_value="/home/krishna/.cortex/cortex_support_log.txt"):
+                            troubleshooter._interactive_loop()
 
-                        # Verify file was opened for writing
-                        mock_file.assert_called_with("cortex_support_log.txt", "w")
+                            # Verify file was opened for writing
+                            mock_file.assert_called_with("/home/krishna/.cortex/cortex_support_log.txt", "w")
 
-                        # Verify content was written
-                        handle = mock_file()
-                        handle.write.assert_any_call("Cortex Troubleshooting Log\n")
-                        handle.write.assert_any_call("Issue Summary:\n")
-                        handle.write.assert_any_call("Issue Summary: Test issue")
+                            # Verify content was written
+                            handle = mock_file()
+                            handle.write.assert_any_call("Cortex Troubleshooting Log\n")
+                            handle.write.assert_any_call("Issue Summary:\n")
+                            handle.write.assert_any_call("Issue Summary: Test issue")
 
                 # Verify instructions were printed
                 mock_console.print.assert_any_call(
-                    "Please open a new issue and attach the cortex_support_log.txt file."
+                    "Please open a new issue and attach the /abs/path/to/log file."
                 )
 
     @patch("cortex.troubleshoot.console")
