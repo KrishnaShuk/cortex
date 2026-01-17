@@ -450,11 +450,16 @@ class TestInteractiveLoop(unittest.TestCase):
                 # Mock file opening to avoid actual file creation
                 with patch("builtins.open", unittest.mock.mock_open()) as mock_file:
                     with patch("os.path.abspath", return_value="/abs/path/to/log"):
-                        with patch("os.path.expanduser", return_value="/home/krishna/.cortex/cortex_support_log.txt"):
+                        with patch(
+                            "os.path.expanduser",
+                            return_value="/home/krishna/.cortex/cortex_support_log.txt",
+                        ):
                             troubleshooter._interactive_loop()
 
                             # Verify file was opened for writing
-                            mock_file.assert_called_with("/home/krishna/.cortex/cortex_support_log.txt", "w")
+                            mock_file.assert_called_with(
+                                "/home/krishna/.cortex/cortex_support_log.txt", "w"
+                            )
 
                             # Verify content was written
                             handle = mock_file()
