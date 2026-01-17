@@ -442,7 +442,9 @@ class TestInteractiveLoop(unittest.TestCase):
         mock_confirm.ask.return_value = False
 
         # Create a platform-independent temp path for testing
-        test_log_path = os.path.join(tempfile.gettempdir(), "test", ".cortex", "cortex_support_log.txt")
+        test_log_path = os.path.join(
+            tempfile.gettempdir(), "test", ".cortex", "cortex_support_log.txt"
+        )
 
         with patch("cortex.troubleshoot.auto_detect_api_key") as mock_detect:
             mock_detect.return_value = (True, "test-key", "fake", "env")
@@ -466,9 +468,7 @@ class TestInteractiveLoop(unittest.TestCase):
                                 troubleshooter._interactive_loop()
 
                             # Verify file was opened for writing
-                            mock_file.assert_called_with(
-                                test_log_path, "w", encoding="utf-8"
-                            )
+                            mock_file.assert_called_with(test_log_path, "w", encoding="utf-8")
 
                             # Verify content was written
                             handle = mock_file()
