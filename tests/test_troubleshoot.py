@@ -2,6 +2,7 @@
 
 import os
 import sys
+import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -440,6 +441,9 @@ class TestInteractiveLoop(unittest.TestCase):
         mock_prompt.ask.side_effect = ["help", "exit"]
         mock_confirm.ask.return_value = False
 
+        # Create a platform-independent temp path for testing
+        test_log_path = os.path.join(tempfile.gettempdir(), "test", ".cortex", "cortex_support_log.txt")
+
         with patch("cortex.troubleshoot.auto_detect_api_key") as mock_detect:
             mock_detect.return_value = (True, "test-key", "fake", "env")
             with patch("cortex.troubleshoot.AskHandler"):
@@ -456,14 +460,14 @@ class TestInteractiveLoop(unittest.TestCase):
                     with patch("os.path.abspath", return_value="/abs/path/to/log"):
                         with patch(
                             "os.path.expanduser",
-                            return_value="/tmp/test/.cortex/cortex_support_log.txt",
+                            return_value=test_log_path,
                         ):
                             with patch("os.makedirs"):  # Prevent fallback to /tmp/
                                 troubleshooter._interactive_loop()
 
                             # Verify file was opened for writing
                             mock_file.assert_called_with(
-                                "/tmp/test/.cortex/cortex_support_log.txt", "w", encoding="utf-8"
+                                test_log_path, "w", encoding="utf-8"
                             )
 
                             # Verify content was written
