@@ -54,7 +54,8 @@ MAX_HISTORY_CONTEXT = 5
 
 
 class Troubleshooter:
-    def __init__(self, no_execute: bool = False):
+    """Interactive AI assistant for diagnosing and resolving system issues."""
+    def __init__(self, no_execute: bool = False) -> None:
         self.logger = CortexLogger("troubleshooter")
         self.no_execute = no_execute
         self.messages: list[dict[str, str]] = []
