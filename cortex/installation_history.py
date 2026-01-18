@@ -105,7 +105,8 @@ class InstallationHistory:
                 cursor = conn.cursor()
 
                 # Create installations table
-                cursor.execute("""
+                cursor.execute(
+                    """
                     CREATE TABLE IF NOT EXISTS installations (
                         id TEXT PRIMARY KEY,
                         timestamp TEXT NOT NULL,
@@ -119,13 +120,16 @@ class InstallationHistory:
                         rollback_available INTEGER,
                         duration_seconds REAL
                     )
-                """)
+                """
+                )
 
                 # Create index on timestamp
-                cursor.execute("""
+                cursor.execute(
+                    """
                     CREATE INDEX IF NOT EXISTS idx_timestamp
                     ON installations(timestamp)
-                """)
+                """
+                )
 
                 conn.commit()
 

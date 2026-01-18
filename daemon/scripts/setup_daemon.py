@@ -34,7 +34,8 @@ def init_audit_db() -> bool:
         cursor = conn.cursor()
 
         # Create events table if it doesn't exist
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS events (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 timestamp TEXT NOT NULL,
@@ -42,7 +43,8 @@ def init_audit_db() -> bool:
                 details TEXT,
                 success INTEGER DEFAULT 1
             )
-        """)
+        """
+        )
 
         conn.commit()
         conn.close()

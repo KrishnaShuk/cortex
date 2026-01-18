@@ -45,7 +45,8 @@ def temp_dir():
 def bash_config(temp_dir):
     """Create a sample .bashrc file."""
     bashrc = temp_dir / ".bashrc"
-    bashrc.write_text("""# Sample bashrc
+    bashrc.write_text(
+        """# Sample bashrc
 export PATH="/usr/local/bin:$PATH"
 export EDITOR="vim"
 export NODE_ENV="development"
@@ -53,7 +54,8 @@ LANG=en_US.UTF-8
 
 # Another PATH modification
 export PATH="$HOME/bin:$PATH"
-""")
+"""
+    )
     return bashrc
 
 
@@ -61,11 +63,13 @@ export PATH="$HOME/bin:$PATH"
 def zsh_config(temp_dir):
     """Create a sample .zshrc file."""
     zshrc = temp_dir / ".zshrc"
-    zshrc.write_text("""# Sample zshrc
+    zshrc.write_text(
+        """# Sample zshrc
 export PATH="/opt/homebrew/bin:$PATH"
 export EDITOR="nvim"
 export ZSH_THEME="robbyrussell"
-""")
+"""
+    )
     return zshrc
 
 
@@ -75,12 +79,14 @@ def fish_config(temp_dir):
     fish_dir = temp_dir / ".config" / "fish"
     fish_dir.mkdir(parents=True)
     config_fish = fish_dir / "config.fish"
-    config_fish.write_text("""# Sample fish config
+    config_fish.write_text(
+        """# Sample fish config
 set -gx PATH /usr/local/bin $PATH
 set -gx EDITOR vim
 set -x NODE_ENV production
 set fish_greeting ""
-""")
+"""
+    )
     return config_fish
 
 
@@ -200,10 +206,12 @@ class TestShellConfigParser:
     def test_parse_bash_quoted_values(self, temp_dir):
         """Test parsing quoted values in bash."""
         bashrc = temp_dir / ".bashrc"
-        bashrc.write_text("""export SINGLE='single quoted'
+        bashrc.write_text(
+            """export SINGLE='single quoted'
 export DOUBLE="double quoted"
 export UNQUOTED=unquoted
-""")
+"""
+        )
         parser = ShellConfigParser(shell=Shell.BASH)
         sources = parser.parse_file(bashrc)
 
@@ -609,10 +617,12 @@ class TestIntegration:
         home = temp_dir / "home"
         home.mkdir()
         bashrc = home / ".bashrc"
-        bashrc.write_text("""export PATH="/custom/bin:$PATH"
+        bashrc.write_text(
+            """export PATH="/custom/bin:$PATH"
 export EDITOR="vim"
 export EDITOR="nano"
-""")
+"""
+        )
 
         with patch.object(Path, "home", return_value=home):
             analyzer = ShellEnvironmentAnalyzer(shell=Shell.BASH)
