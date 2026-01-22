@@ -179,7 +179,7 @@ class InstallationCoordinator:
             self._log(f"Command blocked: {step.command} - {error}")
             return False
 
-        def run_cmd():
+        def run_cmd() -> subprocess.CompletedProcess[str]:
             # Use shell=True carefully - commands are validated first
             # For complex shell commands (pipes, redirects), shell=True is needed
             # Simple commands could use shlex.split() with shell=False
@@ -187,7 +187,7 @@ class InstallationCoordinator:
                 step.command, shell=True, capture_output=True, text=True, timeout=self.timeout
             )
 
-        def status_callback(msg: str):
+        def status_callback(msg: str) -> None:
             self._log(msg)
             # Also print to stdout so the user sees the retry happening
             print(msg)
