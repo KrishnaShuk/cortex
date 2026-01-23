@@ -114,6 +114,14 @@ class SmartRetry:
             status_callback: Optional callback for status messages.
         """
         self.strategies = strategies if strategies is not None else load_strategies_from_env()
+        
+        # Validate strategies
+        for category, strategy in self.strategies.items():
+            if strategy.max_retries < 0:
+                raise ValueError(f"Strategy for {category.name}: max_retries must be non-negative")
+            if strategy.backoff_factor <= 0:
+                raise ValueError(f"Strategy for {category.name}: backoff_factor must be positive")
+
         self.status_callback = status_callback
         self.error_parser = ErrorParser()
 
@@ -147,8 +155,6 @@ class SmartRetry:
                 error_msg = ""
                 if hasattr(result, "stderr") and result.stderr:
                     error_msg = result.stderr
-                elif hasattr(result, "stdout") and result.stdout:
-                    error_msg = result.stdout
 
                 category = self._get_error_category(error_msg)
                 current_strategy = self._get_strategy(category)
@@ -176,7 +182,7 @@ class SmartRetry:
             category_name = category.name if category else "UNKNOWN"
             msg = (
                 f"⚠️ {category_name} detected. "
-                f"Retrying in {sleep_time}s... (Attempt {attempt}/{current_strategy.max_retries})"
+                f"Retrying in {sleep_time}s... (Retry {attempt}/{current_strategy.max_retries})"
             )
             logger.warning(msg)
             if self.status_callback:
@@ -191,6 +197,7 @@ class SmartRetry:
     def _get_error_category(self, error_message: str) -> ErrorCategory | None:
         """Classify the error message into a category."""
         if not error_message:
+            logger.warning("Retry: Empty error message detected. Assuming UNKNOWN (transient).")
             return ErrorCategory.UNKNOWN
 
         analysis = self.error_parser.parse_error(error_message)

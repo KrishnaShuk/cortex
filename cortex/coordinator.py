@@ -194,8 +194,9 @@ class InstallationCoordinator:
 
         def status_callback(msg: str) -> None:
             self._log(msg)
-            # Also print to stdout so the user sees the retry happening
-            print(msg)
+            # Only print to stdout if no progress callback is configured to avoid duplicates
+            if self.progress_callback is None:
+                print(msg)
 
         # Load strategies and apply CLI override for network errors
         strategies = load_strategies_from_env()
