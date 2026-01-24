@@ -14,7 +14,7 @@ from cortex.utils.retry import (
 class TestRetryStrategy(unittest.TestCase):
     """Tests for the RetryStrategy dataclass."""
 
-    def test_strategy_creation(self):
+    def test_strategy_creation(self) -> None:
         strategy = RetryStrategy(max_retries=5, backoff_factor=1.0, description="Test")
         self.assertEqual(strategy.max_retries, 5)
         self.assertEqual(strategy.backoff_factor, 1.0)
@@ -24,22 +24,22 @@ class TestRetryStrategy(unittest.TestCase):
 class TestDefaultStrategies(unittest.TestCase):
     """Tests for default strategy configurations."""
 
-    def test_network_error_strategy(self):
+    def test_network_error_strategy(self) -> None:
         strategy = DEFAULT_STRATEGIES[ErrorCategory.NETWORK_ERROR]
         self.assertEqual(strategy.max_retries, 5)
         self.assertEqual(strategy.backoff_factor, 1.0)
 
-    def test_lock_error_strategy(self):
+    def test_lock_error_strategy(self) -> None:
         strategy = DEFAULT_STRATEGIES[ErrorCategory.LOCK_ERROR]
         self.assertEqual(strategy.max_retries, 3)
         self.assertEqual(strategy.backoff_factor, 5.0)
 
-    def test_unknown_error_strategy(self):
+    def test_unknown_error_strategy(self) -> None:
         strategy = DEFAULT_STRATEGIES[ErrorCategory.UNKNOWN]
         self.assertEqual(strategy.max_retries, 2)
         self.assertEqual(strategy.backoff_factor, 2.0)
 
-    def test_permanent_errors_not_in_strategies(self):
+    def test_permanent_errors_not_in_strategies(self) -> None:
         for error in PERMANENT_ERRORS:
             self.assertNotIn(error, DEFAULT_STRATEGIES)
 
@@ -47,12 +47,12 @@ class TestDefaultStrategies(unittest.TestCase):
 class TestLoadStrategiesFromEnv(unittest.TestCase):
     """Tests for environment variable configuration."""
 
-    def test_default_strategies_when_no_env_vars(self):
+    def test_default_strategies_when_no_env_vars(self) -> None:
         with patch.dict("os.environ", {}, clear=True):
             strategies = load_strategies_from_env()
             self.assertEqual(strategies[ErrorCategory.NETWORK_ERROR].max_retries, 5)
 
-    def test_network_override_from_env(self):
+    def test_network_override_from_env(self) -> None:
         with patch.dict(
             "os.environ",
             {"CORTEX_RETRY_NETWORK_MAX": "10", "CORTEX_RETRY_NETWORK_BACKOFF": "0.5"},
@@ -62,7 +62,7 @@ class TestLoadStrategiesFromEnv(unittest.TestCase):
             self.assertEqual(strategies[ErrorCategory.NETWORK_ERROR].max_retries, 10)
             self.assertEqual(strategies[ErrorCategory.NETWORK_ERROR].backoff_factor, 0.5)
 
-    def test_lock_override_from_env(self):
+    def test_lock_override_from_env(self) -> None:
         with patch.dict(
             "os.environ",
             {"CORTEX_RETRY_LOCK_MAX": "6", "CORTEX_RETRY_LOCK_BACKOFF": "10.0"},
@@ -85,7 +85,7 @@ class TestSmartRetry(unittest.TestCase):
         }
         self.retry = SmartRetry(strategies=self.fast_strategies)
 
-    def test_success_first_try(self):
+    def test_success_first_try(self) -> None:
         mock_func = Mock()
         mock_result = Mock()
         mock_result.returncode = 0
@@ -97,7 +97,7 @@ class TestSmartRetry(unittest.TestCase):
         self.assertEqual(mock_func.call_count, 1)
 
     @patch("cortex.utils.retry.time.sleep")
-    def test_retry_on_network_error(self, mock_sleep):
+    def test_retry_on_network_error(self, mock_sleep) -> None:
         mock_func = Mock()
 
         fail_result = Mock()
@@ -116,7 +116,7 @@ class TestSmartRetry(unittest.TestCase):
         self.assertEqual(mock_sleep.call_count, 2)
 
     @patch("cortex.utils.retry.time.sleep")
-    def test_fail_fast_on_permission_denied(self, mock_sleep):
+    def test_fail_fast_on_permission_denied(self, mock_sleep) -> None:
         mock_func = Mock()
 
         fail_result = Mock()
@@ -132,7 +132,7 @@ class TestSmartRetry(unittest.TestCase):
         mock_sleep.assert_not_called()
 
     @patch("cortex.utils.retry.time.sleep")
-    def test_fail_fast_on_disk_space(self, mock_sleep):
+    def test_fail_fast_on_disk_space(self, mock_sleep) -> None:
         mock_func = Mock()
 
         fail_result = Mock()
@@ -148,7 +148,7 @@ class TestSmartRetry(unittest.TestCase):
         mock_sleep.assert_not_called()
 
     @patch("cortex.utils.retry.time.sleep")
-    def test_max_retries_exceeded(self, mock_sleep):
+    def test_max_retries_exceeded(self, mock_sleep) -> None:
         mock_func = Mock()
 
         fail_result = Mock()
@@ -165,7 +165,7 @@ class TestSmartRetry(unittest.TestCase):
         self.assertEqual(mock_sleep.call_count, 3)
 
     @patch("cortex.utils.retry.time.sleep")
-    def test_different_strategy_for_lock_error(self, mock_sleep):
+    def test_different_strategy_for_lock_error(self, mock_sleep) -> None:
         mock_func = Mock()
 
         fail_result = Mock()
@@ -182,7 +182,7 @@ class TestSmartRetry(unittest.TestCase):
         self.assertEqual(mock_sleep.call_count, 2)
 
     @patch("cortex.utils.retry.time.sleep")
-    def test_callback_notification(self, mock_sleep):
+    def test_callback_notification(self, mock_sleep) -> None:
         callback = Mock()
         retry = SmartRetry(strategies=self.fast_strategies, status_callback=callback)
 
@@ -200,7 +200,7 @@ class TestSmartRetry(unittest.TestCase):
         self.assertIn("Retrying", callback.call_args[0][0])
 
     @patch("cortex.utils.retry.time.sleep")
-    def test_exception_retry(self, mock_sleep):
+    def test_exception_retry(self, mock_sleep) -> None:
         mock_func = Mock()
         mock_func.side_effect = [Exception("Network error"), Mock(returncode=0)]
 

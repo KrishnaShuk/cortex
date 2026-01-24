@@ -99,7 +99,7 @@ class InstallationCoordinator:
         enable_rollback: bool | None = None,
         log_file: str | None = None,
         progress_callback: Callable[[int, int, InstallationStep], None] | None = None,
-        max_retries: int = 5,
+        max_retries: int = DEFAULT_MAX_RETRIES,
     ) -> "InstallationCoordinator":
         """Create a coordinator from a structured plan produced by an LLM.
 
